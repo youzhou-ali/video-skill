@@ -1,0 +1,16 @@
+{
+  "title": "48秒工作间悬疑：原创镜头数据范例",
+  "note": "所有素材长度未知。数值为计划而非实拍结果；镜头数组按剪辑顺序。handles与usable_source均按时间线播放速度解释。",
+  "fps": 25,
+  "target_duration_s": 48,
+  "shots": [
+    {"shot_id":"S01","duration_s":5,"transition_out_s":0,"handle_in_s":1,"handle_out_s":1,"usable_source_s":null,"purpose":"进入工作间，建立空间","camera":"竖屏纵深全景，固定","audio":"门声过渡到机器底声"},
+    {"shot_id":"S02","duration_s":6,"transition_out_s":0,"handle_in_s":1,"handle_out_s":1,"usable_source_s":null,"purpose":"抚过胸前红斜纹缺角工牌后看屏幕，建立工牌特征","camera":"东侧中景，固定，手、工牌和脸同框","audio":"机器声节律稍慢"},
+    {"shot_id":"S03","duration_s":5,"transition_out_s":0,"handle_in_s":1,"handle_out_s":1,"usable_source_s":null,"purpose":"读清99%，精确文字后期合成","camera":"屏幕近景，固定","audio":"重复一次提示音"},
+    {"shot_id":"S04","duration_s":7,"transition_out_s":0,"handle_in_s":1,"handle_out_s":1,"usable_source_s":null,"purpose":"按键后等待，无变化","camera":"手部近景，固定，覆盖按下和松开","audio":"按钮声与机器声错拍"},
+    {"shot_id":"S05","duration_s":6,"transition_out_s":0,"handle_in_s":1,"handle_out_s":1,"usable_source_s":null,"purpose":"人物确认异常","camera":"东侧脸部近景，确认时短直线推进","audio":"机器声退低，呼吸可闻"},
+    {"shot_id":"S06","duration_s":5,"transition_out_s":0,"handle_in_s":1,"handle_out_s":1,"usable_source_s":null,"purpose":"新的循环编号出现，后期合成数字","camera":"屏幕固定特写","audio":"一次提示音"},
+    {"shot_id":"S07","duration_s":8,"transition_out_s":0,"handle_in_s":1,"handle_out_s":1,"usable_source_s":null,"purpose":"从工作台东侧通道绕到背后，伸手拾物","camera":"固定中景，全程保留通道与拾物动作接点","audio":"工牌碰撞声先于人物转头"},
+    {"shot_id":"S08","duration_s":6,"transition_out_s":0,"handle_in_s":1,"handle_out_s":1,"usable_source_s":null,"purpose":"拾到工牌与胸前原工牌同框，两者缺角和红斜纹相同","camera":"胸上近景，两张工牌靠近同一焦平面并保持可辨","audio":"机器节律恢复"}
+  ]
+}

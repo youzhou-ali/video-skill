@@ -1,0 +1,11 @@
+interface:
+  display_name: 电影拍摄与视听设计
+  short_description: 把故事转化为可执行的分镜、运镜、布光和剪辑方案，兼顾实拍与 AI 视频
+  default_prompt: 使用 $cinematic-filmmaking，把我的故事转化为有叙事动机、空间连续性和明确执行参数的分镜、运镜、布光与声音方案。
+policy:
+  products:
+  - chatgpt
+  - codex
+  - api
+  - atlas
+  allow_implicit_invocation: true
