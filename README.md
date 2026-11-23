@@ -90,3 +90,26 @@ python3 skills/cinematic-filmmaking/scripts/check_shot_plan.py \
 工作流、案例、模板和检查器是综合设计；示例参数是可调整的起点。机型、固件、软件、平台规格、AI 模型能力和价格应在实际使用时核实当前官方资料。技能不会把三分法、三点布光、180 度轴线或 180 度快门当作所有作品必须遵守的规则。
 
 仓库保留原始来源链接，不包含来源网站的整本手册、课程或影音素材；引用不表示来源机构认可本项目，也不改变原始资料的权利归属。
+
+---
+
+# 代码绘制视频 · video-craft-playbook
+
+第二个技能：让 Claude 写代码逐帧绘制视频。流程是简报 → 剧本分镜 → 关键帧 → 半尺寸草稿 → 成片。收入 6 个开源项目的风格库、参考文档和质检脚本，共 109 种风格，附两支 30 秒示例：《红笔》和《回家的线》。
+
+**技能名：** `video-craft-playbook`  
+**技能入口：** [skills/video-craft-playbook/SKILL.md](skills/video-craft-playbook/SKILL.md)  
+**风格总目录：** [skills/video-craft-playbook/styles/INDEX.md](skills/video-craft-playbook/styles/INDEX.md)  
+**第三方资产与许可：** [skills/video-craft-playbook/THIRD_PARTY.md](skills/video-craft-playbook/THIRD_PARTY.md)
+
+安装：
+
+```bash
+git clone https://github.com/youzhou-ali/video-skill.git
+mkdir -p ~/.claude/skills
+cp -R video-skill/skills/video-craft-playbook ~/.claude/skills/
+```
+
+渲染示例需要 Node.js、Playwright（带 Chromium）、ffmpeg；示例的声音需要 Python 的 numpy 和 scipy。
+
+许可：`vendor/` 里的内容保留各自原许可，其中 lemo-opuscar 的文档是 CC BY-NC 4.0（非商业），详见 THIRD_PARTY.md。

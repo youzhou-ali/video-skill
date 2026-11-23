@@ -1,0 +1,264 @@
+<!doctype html><meta charset="utf-8">
+<style>html,body{margin:0;background:#111}canvas{display:block}</style>
+<canvas id="c"></canvas>
+<script>
+// 《回家的线》一笔画。整片是一个点数组；画面 = f(t)，不存跨帧状态，不用 Math.random。
+const W = 1920, H = 1080, FPS = 30, DURATION = 30;
+const SCALE = +(new URLSearchParams(location.search).get('scale') || 1);
+const Q = new URLSearchParams(location.search);
+const C = { paper: '#F4EFE4', ink: '#1D1A17', acc: '#E0A030' };
+const FONT = '"Noto Sans CJK SC","Noto Sans CJK JP",sans-serif';
+const cv = document.getElementById('c'); cv.width = W * SCALE; cv.height = H * SCALE;
+const g = cv.getContext('2d');
+
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const lerp = (a, b, k) => a + (b - a) * k;
+const ss = x => x * x * (3 - 2 * x);
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const hash = i => { const s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+const vnoise = x => { const i = Math.floor(x), f = x - i; return lerp(hash(i), hash(i + 1), ss(f)) * 2 - 1; };
+const TAU = Math.PI * 2;
+
+// ---------- 路径：章节 = 一段点 + 时间窗 ----------
+const STEP = 2;
+const CH = [];           // {name, t0, t1, pts:[[x,y]], acc}
+let cur = [-600, 300];
+function chapter(name, t0, t1, build, acc = false) {
+  const pts = [cur.slice()];
+  const to = (x, y) => {                                 // 直线
+    const [x0, y0] = pts[pts.length - 1], d = Math.hypot(x - x0, y - y0), n = Math.max(1, Math.ceil(d / STEP));
+    for (let i = 1; i <= n; i++) pts.push([lerp(x0, x, i / n), lerp(y0, y, i / n)]);
+  };
+  const cubic = (x1, y1, x2, y2, x, y) => {             // 三次贝塞尔
+    const [x0, y0] = pts[pts.length - 1], n = 80;
+    for (let i = 1; i <= n; i++) { const u = i / n, v = 1 - u;
+      pts.push([v*v*v*x0 + 3*v*v*u*x1 + 3*v*u*u*x2 + u*u*u*x, v*v*v*y0 + 3*v*v*u*y1 + 3*v*u*u*y2 + u*u*u*y]); }
+  };
+  const loop = (cx, cy, r, a0, dir = 1, turns = 1) => {  // 整圈，从 a0 出发回到 a0
+    const n = Math.ceil(TAU * r * turns / STEP);
+    for (let i = 1; i <= n; i++) { const a = a0 + dir * TAU * turns * i / n; pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); }
+  };
+  build({ to, cubic, loop, pts });
+  cur = pts[pts.length - 1].slice();
+  CH.push({ name, t0, t1, pts, acc });
+}
+const FLOOR = 300;
+// 1 起笔与门
+chapter('door', 0.0, 3.2, ({ to }) => { to(-470, FLOOR); to(-470, 132); to(-462, 130); to(-378, 130); to(-370, 132); to(-370, FLOOR); });
+// 2 火车：每节先沿地面画两个轮子，再上后墙、车顶向左、下前墙，再沿地面退回到车尾
+const car = (x0, x1, nose, b) => {
+  b.to(x0 + 26, FLOOR); b.loop(x0 + 26, FLOOR - 14, 14, Math.PI / 2, -1);
+  b.to(x1 - 26, FLOOR); b.loop(x1 - 26, FLOOR - 14, 14, Math.PI / 2, -1);
+  b.to(x1, FLOOR); b.to(x1, 244); b.to(x1 - 6, 236);
+  if (nose) { b.to(x0 + 30, 236); b.to(x0, FLOOR); } else { b.to(x0 + 6, 236); b.to(x0, 244); b.to(x0, FLOOR); }
+  b.to(x1, FLOOR);
+};
+chapter('train1', 3.2, 5.0, b => { b.to(-250, FLOOR); car(-250, -140, true, b); });
+chapter('train2', 5.0, 6.7, b => { b.to(-125, FLOOR); car(-125, -15, false, b); });
+chapter('train3', 6.7, 8.5, b => { b.to(0, FLOOR); car(0, 110, false, b); });
+// 3 街道 4 右墙
+chapter('street', 8.5, 9.1, ({ to }) => to(600, FLOOR));
+chapter('wall', 9.1, 10.0, ({ to }) => to(600, -50));
+// 5 右坡、烟囱、烟（烟原路退回）
+const slopeY = x => -50 - (600 - x) * (370 / 600);
+chapter('slopeR', 10.0, 10.8, ({ to }) => to(360, slopeY(360)));
+chapter('chimney', 10.8, 11.9, ({ to }) => { to(360, -330); to(330, -330); });
+const smoke = [];
+chapter('smoke', 11.9, 13.8, ({ cubic, pts }) => {
+  const s0 = pts.length;
+  cubic(318, -365, 352, -395, 338, -425); cubic(326, -450, 302, -440, 312, -466); cubic(320, -486, 348, -484, 344, -506);
+  for (let i = pts.length - 2; i >= s0 - 1; i--) pts.push(pts[i].slice());   // 原路退回
+});
+chapter('chimney2', 13.8, 14.5, ({ to }) => { to(300, -330); to(300, slopeY(300)); });
+chapter('peak', 14.5, 15.6, ({ to }) => to(0, -420));
+// 6 灯：灯绳、灯罩、灯泡（强调色）、灯罩、退回灯绳
+chapter('cord', 15.6, 16.4, ({ to }) => to(0, -70));
+chapter('shadeL', 16.4, 17.3, ({ to }) => { to(-74, 0); to(0, 0); });
+chapter('bulb', 17.3, 19.6, ({ loop }) => loop(0, 26, 26, -Math.PI / 2, 1), true);
+chapter('shadeR', 19.6, 20.2, ({ to }) => { to(74, 0); to(0, -70); });
+chapter('cordUp', 20.2, 20.9, ({ to }) => to(0, -420));
+// 7 左坡、左墙，回到起点
+chapter('slopeL', 20.9, 23.9, ({ to }) => to(-600, -50));
+chapter('wallL', 23.9, 26.2, ({ to }) => to(-600, FLOOR));
+const END_T = 26.2;
+
+// 时间分配：章节窗口内按 1 + K·拐角 加权（拐角处多给时间），平滑后归一
+const PTS = [];          // {x,y,t,acc,v}
+for (const ch of CH) {
+  const p = ch.pts, n = p.length, turn = new Array(n).fill(0);
+  for (let i = 1; i < n - 1; i++) {
+    const a1 = Math.atan2(p[i][1] - p[i - 1][1], p[i][0] - p[i - 1][0]), a2 = Math.atan2(p[i + 1][1] - p[i][1], p[i + 1][0] - p[i][0]);
+    let d = Math.abs(a2 - a1); if (d > Math.PI) d = TAU - d; turn[i] = d;
+  }
+  const sm = turn.map((_, i) => { let s = 0, c = 0; for (let k = -6; k <= 6; k++) { const j = i + k; if (j >= 0 && j < n) { s += turn[j]; c++; } } return s / c; });
+  const w = [0]; for (let i = 1; i < n; i++) w.push(w[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]) * (1 + 10 * sm[i]));
+  const total = w[n - 1] || 1, start = PTS.length ? 1 : 0;
+  for (let i = start; i < n; i++) PTS.push({ x: p[i][0], y: p[i][1], t: lerp(ch.t0, ch.t1, ss(w[i] / total) * .25 + w[i] / total * .75), acc: ch.acc });
+}
+for (let i = 0; i < PTS.length; i++) {
+  const a = PTS[Math.max(0, i - 3)], b = PTS[Math.min(PTS.length - 1, i + 3)];
+  PTS[i].v = Math.hypot(b.x - a.x, b.y - a.y) / Math.max(1e-3, b.t - a.t);
+}
+const idxAt = t => { let lo = 0, hi = PTS.length - 1; if (t <= PTS[0].t) return 0; if (t >= PTS[hi].t) return hi;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (PTS[m].t <= t) lo = m; else hi = m; } return lo; };
+function nib(t) {
+  const i = idxAt(t), a = PTS[i], b = PTS[Math.min(i + 1, PTS.length - 1)], k = b.t > a.t ? clamp((t - a.t) / (b.t - a.t)) : 0;
+  return { i, k, x: lerp(a.x, b.x, k), y: lerp(a.y, b.y, k), v: t < PTS[0].t || t > END_T ? 0 : lerp(a.v, b.v, k) };
+}
+
+// ---------- 镜头：构图关键帧 + 跟随笔尖 ----------
+const KEYS = [ // t, cx, cy, z, follow, roll(度)
+  [0, -575, 285, 4.6, .1, 0], [1.3, -450, 228, 3.2, .2, 0], [3.0, -420, 235, 3.0, .35, 0], [4.0, -190, 262, 2.5, .7, 0], [8.5, 90, 270, 2.3, .8, 0],
+  [9.1, 330, 250, 1.6, .2, 0], [10.0, 420, 80, 1.55, .25, -2], [10.9, 350, -250, 2.6, .4, -2], [14.5, 330, -340, 2.6, .35, 0],
+  [15.6, 0, -330, 2.4, .6, 0], [16.6, 0, -30, 2.8, .25, 0], [20.2, 0, -30, 2.8, .25, 0], [20.9, -60, -180, 2.4, .5, 0],
+  [26.2, 0, 60, .85, 0, 0], [30, 0, 60, .9, 0, 0]];
+function camKey(t) {
+  let i = 0; while (i < KEYS.length - 2 && KEYS[i + 1][0] <= t) i++;
+  const a = KEYS[i], b = KEYS[i + 1], k = ss(seg(t, a[0], b[0]));
+  return { cx: lerp(a[1], b[1], k), cy: lerp(a[2], b[2], k), z: Math.exp(lerp(Math.log(a[3]), Math.log(b[3]), k)), f: lerp(a[4], b[4], k), roll: lerp(a[5], b[5], k) * Math.PI / 180 };
+}
+function cam(t) {
+  const c = camKey(t);
+  let fx = 0, fy = 0, ws = 0;                            // 跟随点：笔尖在 −0.55…+0.4 秒的加权平均
+  for (let k = 0; k <= 8; k++) { const dt = lerp(-.55, .4, k / 8), w = 1 - Math.abs(dt) * .8, n = nib(t + dt); fx += n.x * w; fy += n.y * w; ws += w; }
+  fx /= ws; fy /= ws;
+  let cx = lerp(c.cx, fx, c.f), cy = lerp(c.cy, fy, c.f);
+  const n = nib(t), hx = W * .36 / c.z, hy = H * .33 / c.z;   // 软约束：笔尖留在中间 72%×66%
+  if (t < END_T) { cx += Math.max(0, n.x - cx - hx) - Math.max(0, cx - n.x - hx); cy += Math.max(0, n.y - cy - hy) - Math.max(0, cy - n.y - hy); }
+  return { cx, cy, z: c.z, roll: c.roll };
+}
+
+// ---------- 纸 ----------
+const paperTex = (() => {
+  const s = 48, small = document.createElement('canvas'); small.width = small.height = s;   // 大块斑驳：两层值噪声，不用逐像素随机（会出条纹）
+  const sg = small.getContext('2d'), im = sg.createImageData(s, s);
+  const vn2 = (x, y, f) => { const xi = Math.floor(x * f), yi = Math.floor(y * f), xf = ss(x * f - xi), yf = ss(y * f - yi), h = (a, b) => hash(((a % (s*f/s|0||1)) + 97) * 57.3 + ((b) + 13) * 311.1);
+    return lerp(lerp(h(xi, yi), h(xi + 1, yi), xf), lerp(h(xi, yi + 1), h(xi + 1, yi + 1), xf), yf); };
+  for (let y = 0; y < s; y++) for (let x = 0; x < s; x++) { const i = y * s + x, v = .6 * vn2(x / s, y / s, 6) + .4 * vn2(x / s, y / s, 13);
+    im.data[i*4] = 150; im.data[i*4+1] = 130; im.data[i*4+2] = 100; im.data[i*4+3] = 4 + v * 12; }
+  sg.putImageData(im, 0, 0);
+  const big = document.createElement('canvas'); big.width = big.height = 768; const bg = big.getContext('2d');
+  // 大块斑驳在全景里会露出方格和接缝，去掉，只留细颗粒
+  const fine = bg.createImageData(768, 768);                       // 细颗粒
+  for (let i = 0; i < 768 * 768; i++) { const v = hash(i * .91 + 7); fine.data[i*4] = 90; fine.data[i*4+1] = 80; fine.data[i*4+2] = 60; fine.data[i*4+3] = v > .985 ? 26 : 0; }
+  const f2 = document.createElement('canvas'); f2.width = f2.height = 768; f2.getContext('2d').putImageData(fine, 0, 0); bg.drawImage(f2, 0, 0);
+  return big;
+})();
+let paperPat = null;
+
+// ---------- 墨线 ----------
+const BASE = 3.2;
+const pressure = v => .66 + .8 * Math.exp(-v / 300);
+function widthAt(i, zw) { const p = PTS[i]; return BASE * pressure(p.v) * (1 + .08 * vnoise(i * .045)) * zw; }
+function strokeRun(i0, i1, n, zw, color, scaleW = 1, alpha = 1) {
+  const L = [], R = [];
+  const pt = j => j === i1 + 1 ? [n.x, n.y] : [PTS[j].x, PTS[j].y];
+  const last = n.k > 0 && i1 === n.i ? i1 + 1 : i1;
+  for (let j = i0; j <= last; j++) {
+    const a = pt(Math.max(i0, j - 1)), b = pt(Math.min(last, j + 1)), p = pt(j);
+    let dx = b[0] - a[0], dy = b[1] - a[1]; const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
+    const w = widthAt(Math.min(j, PTS.length - 1), zw) * scaleW / 2;
+    L.push([p[0] - dy * w, p[1] + dx * w]); R.push([p[0] + dy * w, p[1] - dx * w]);
+  }
+  if (L.length < 2) return;
+  g.beginPath(); g.moveTo(L[0][0], L[0][1]);
+  for (const q of L) g.lineTo(q[0], q[1]);
+  for (let j = R.length - 1; j >= 0; j--) g.lineTo(R[j][0], R[j][1]);
+  g.closePath(); g.globalAlpha = alpha; g.fillStyle = color; g.fill();
+  const r0 = widthAt(i0, zw) * scaleW / 2, rl = widthAt(Math.min(last, PTS.length - 1), zw) * scaleW / 2;   // 圆头
+  g.beginPath(); g.arc(pt(i0)[0], pt(i0)[1], r0, 0, TAU); g.arc(pt(last)[0], pt(last)[1], rl, 0, TAU); g.fill();
+  g.globalAlpha = 1;
+}
+function drawInk(t, z) {
+  const n = nib(t), zw = Math.max(z, 1.3) / z;         // 拉远时线宽在屏幕上不低于 1.3 倍时的粗细
+  if (t < PTS[0].t) return n;
+  const runs = []; let s = 0;                           // 按颜色分段
+  for (let j = 1; j <= n.i; j++) if (PTS[j].acc !== PTS[j - 1].acc) { runs.push([s, j, PTS[j - 1].acc]); s = j - 1; }
+  runs.push([s, n.i, PTS[n.i].acc]);
+  for (const [a, b] of runs) strokeRun(a, b, n, zw, C.ink, 1.5, .1);               // 洇墨
+  for (const [a, b, acc] of runs) strokeRun(a, b, n, zw, acc ? C.acc : C.ink, 1, acc ? 1 : .96);
+  g.fillStyle = C.ink;                                   // 慢处积墨
+  for (let j = 0; j <= n.i; j += 3) { const p = PTS[j]; if (p.v < 45 && !p.acc) { g.globalAlpha = .55; g.beginPath(); g.arc(p.x, p.y, widthAt(j, zw) * .62, 0, TAU); g.fill(); } }
+  g.globalAlpha = 1;
+  return n;
+}
+function drawBlot(t, z) {                                // 停笔：泪滴形墨点，尖在笔尖，肚子往下垂
+  const u = easeOut(seg(t, END_T, END_T + 1.2)); if (u <= 0) return;
+  const zw = Math.max(z, 1.3) / z, A = PTS[PTS.length - 1], r = (3.2 + 4.2 * u) * zw, sag = 5 * u * zw;
+  g.fillStyle = C.ink; g.globalAlpha = .9;
+  g.beginPath(); g.moveTo(A.x, A.y - r * .6);
+  g.bezierCurveTo(A.x + r * 1.1, A.y + sag * .2, A.x + r, A.y + sag + r, A.x, A.y + sag + r * 1.05);
+  g.bezierCurveTo(A.x - r, A.y + sag + r, A.x - r * 1.1, A.y + sag * .2, A.x, A.y - r * .6); g.fill();
+  g.globalAlpha = .35; g.lineWidth = .9 * zw; g.strokeStyle = C.ink; g.stroke(); g.globalAlpha = 1;
+}
+
+// ---------- 笔影（不画笔，只画影子） ----------
+function drawPenShadow(sx, sy, lift) {
+  const L = 190, ang = .62, spread = .09, ox = lift * 60, oy = lift * 80;
+  const p0 = [sx + ox, sy + oy], p1 = [p0[0] + Math.cos(ang - spread) * L, p0[1] + Math.sin(ang - spread) * L], p2 = [p0[0] + Math.cos(ang + spread) * L, p0[1] + Math.sin(ang + spread) * L];
+  const gr = g.createLinearGradient(p0[0], p0[1], (p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2);
+  const a = .11 * (1 - lift);
+  gr.addColorStop(0, `rgba(60,45,30,${a})`); gr.addColorStop(.25, `rgba(60,45,30,${a * .8})`); gr.addColorStop(1, 'rgba(60,45,30,0)');
+  g.fillStyle = gr; g.beginPath(); g.moveTo(p0[0], p0[1]); g.lineTo(p1[0], p1[1]); g.lineTo(p2[0], p2[1]); g.closePath(); g.fill();
+  if (lift < .05) { g.fillStyle = 'rgba(29,26,23,.5)'; g.beginPath(); g.arc(sx, sy, 2, 0, TAU); g.fill(); }
+}
+
+// ---------- 结尾：灯亮、写字 ----------
+const LIGHT_T = 26.75, TEXT_T = 26.95;
+function drawGlow(t) {
+  const u = easeOut(seg(t, LIGHT_T, LIGHT_T + .9)); if (u <= 0) return;
+  const flick = 1 + .03 * Math.sin(t * 7) * seg(t, LIGHT_T, LIGHT_T + .4) * (1 - seg(t, LIGHT_T + .4, LIGHT_T + .9));
+  const gr = g.createRadialGradient(0, 26, 10, 0, 26, 260);
+  const breath = 1 + .08 * Math.sin((t - LIGHT_T) * Math.PI * .9) * seg(t, LIGHT_T + .9, LIGHT_T + 1.6);
+  gr.addColorStop(0, `rgba(240,180,60,${.30 * u * flick * breath})`); gr.addColorStop(.35, `rgba(240,180,60,${.12 * u})`); gr.addColorStop(1, 'rgba(240,180,60,0)');
+  g.fillStyle = gr; g.beginPath(); g.arc(0, 26, 260, 0, TAU); g.fill();
+}
+function writeText(t) {
+  const lines = [['回家的线', 72, 400, TEXT_T, .88, 872], ['zhongli · 钟笠的个人日志', 34, 300, TEXT_T + .8, .7, 942]];
+  for (const [s, size, wt, t0, al, y] of lines) {
+    const dur = .25 + .09 * s.length, u = seg(t, t0, t0 + dur);
+    if (u <= 0) continue;
+    g.font = `${wt} ${size}px ${FONT}`; const w = g.measureText(s).width, x = (W - w) / 2;
+    g.save(); g.beginPath(); g.rect(x - 4, y - size * 1.2, (w + 8) * u, size * 1.6); g.clip();
+    g.fillStyle = C.ink; g.globalAlpha = al; g.fillText(s, x, y); g.restore();
+  }
+}
+function renderAt(t) {
+  g.setTransform(SCALE, 0, 0, SCALE, 0, 0); g.globalAlpha = 1;
+  const c = cam(t);
+  g.fillStyle = C.paper; g.fillRect(0, 0, W, H);
+  g.save();
+  g.translate(W / 2, H / 2); g.rotate(c.roll); g.scale(c.z, c.z); g.translate(-c.cx, -c.cy);
+  if (!paperPat) paperPat = g.createPattern(paperTex, 'repeat');
+  g.fillStyle = paperPat; g.fillRect(c.cx - W / c.z, c.cy - H / c.z, 2 * W / c.z, 2 * H / c.z);   // 纸纹贴在纸上，随镜头走
+  drawGlow(t);
+  const all = Q.get('all') === '1';
+  const n = drawInk(all ? 99 : t, c.z);
+  drawBlot(all ? 99 : t, c.z);
+  const m = g.getTransform();
+  g.restore();
+  // 笔影：屏幕坐标
+  const p = new DOMPoint(n.x, n.y).matrixTransform(m);
+  const lift = seg(t, END_T + .3, END_T + 1.1);
+  if (!all && t >= 0 && lift < 1) { g.setTransform(1, 0, 0, 1, 0, 0); drawPenShadow(p.x, p.y, lift); g.setTransform(SCALE, 0, 0, SCALE, 0, 0); }
+  writeText(t);
+  const vg = g.createRadialGradient(W / 2, H / 2, H * .45, W / 2, H / 2, H * 1.05);   // 暗角
+  vg.addColorStop(0, 'rgba(90,70,50,0)'); vg.addColorStop(1, 'rgba(90,70,50,.13)'); g.fillStyle = vg; g.fillRect(0, 0, W, H);
+}
+
+// 给声音用：每帧笔尖的位置、速度、屏幕横坐标
+window.nibTrack = () => { const out = []; for (let f = 0; f < DURATION * FPS; f++) { const t = f / FPS, n = nib(t), c = cam(t);
+  out.push({ t, v: n.v, x: n.x, y: n.y, sx: (n.x - c.cx) * c.z / W, acc: PTS[n.i].acc, ch: CH.findIndex(ch => t >= ch.t0 && t < ch.t1) }); } return out; };
+window.corners = () => { const out = []; for (let i = 4; i < PTS.length - 4; i++) {
+    const a1 = Math.atan2(PTS[i].y - PTS[i-4].y, PTS[i].x - PTS[i-4].x), a2 = Math.atan2(PTS[i+4].y - PTS[i].y, PTS[i+4].x - PTS[i].x);
+    let d = Math.abs(a2 - a1); if (d > Math.PI) d = TAU - d;
+    if (d > .7 && (!out.length || PTS[i].t - out[out.length - 1].t > .14)) out.push({ t: PTS[i].t, y: PTS[i].y, acc: PTS[i].acc }); }
+  return out; };
+window.CHAPTERS = CH.map(c => ({ name: c.name, t0: c.t0, t1: c.t1 }));
+window.renderAt = renderAt;
+Promise.all([document.fonts.load(`300 56px ${FONT}`)]).then(() => {
+  window.SCENE = { W: W * SCALE, H: H * SCALE, FPS, DURATION };
+  if (!location.search.includes('render')) { const t0 = performance.now(); (function loop() { renderAt(((performance.now() - t0) / 1000) % DURATION); requestAnimationFrame(loop); })(); }
+});
+</script>
