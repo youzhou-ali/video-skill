@@ -40,3 +40,7 @@
 ## 角色与商标
 
 Clawd 及其名称属于 Anthropic，以上任何仓库的许可都不覆盖它。本 skill 没有收入任何绘制 Clawd 的代码或含 Clawd 的图片。
+
+## 本仓库原有的电影视听设计内容
+
+`references/film/`、`assets/production-plan-template.md`、`assets/shot-plan-template.json`、`scripts/check_shot_plan.py` 来自本仓库原来的 `cinematic-filmmaking` 技能，2026-11-23 合并进本手册，内容未改。各模块引用的外部资料链接与适用边界保留在各文件文末，统一索引见 `references/film/source-map.md`。
